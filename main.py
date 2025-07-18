@@ -13,6 +13,7 @@ remaining_break_time = 0
 timer_running = True
 timer_id = None
 
+
 def placeholder(name):
     print(f"{name} clicked!")
 
@@ -125,6 +126,9 @@ def show_main_menu():
 
         remaining_study_time = int(study_time)*60
         remaining_break_time = int(break_time)*60
+        timer_running = True
+        status_is_study = True
+        timer_id = None
 
         mode_label = tk.Label(root, text="Study 🎓" if status_is_study else "Break 😌", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
         mode_label.pack(pady=(60, 10))
@@ -135,6 +139,9 @@ def show_main_menu():
 
         def update_timer():
             global remaining_study_time, remaining_break_time, status_is_study, timer_id
+
+            if not timer_running:
+                return
 
             if status_is_study:
                 if remaining_study_time > 0:
@@ -156,24 +163,34 @@ def show_main_menu():
                     timer_id = root.after(1000, update_timer)
                 else:
                     status_is_study = True
-                    pomodoro()
+                    remaining_study_time = study_time * 60
+                    remaining_break_time = break_time * 60
+                    update_timer()
 
         def pause_timer():
-            global timer_id, timer_running
-            root.after_cancel(timer_id)
+            global timer_running, timer_id
             timer_running = False
+            if timer_id is not None:
+                root.after_cancel(timer_id)
+                timer_id = None
 
         def resume_timer():
-            global timer_running
-            if timer_running == False:
+            global timer_running, timer_id
+            if not timer_running:
                 timer_running = True
-                update_timer()
+                if timer_id is None:
+                    update_timer()
 
         def restart_timer():
-            global remaining_study_time, remaining_break_time
-            root.after_cancel(timer_id)
+            global timer_running, timer_id, remaining_break_time, remaining_study_time, status_is_study
+            if timer_id != None:
+                root.after_cancel(timer_id)
+                timer_id = None
             remaining_study_time = study_time * 60
             remaining_break_time = break_time * 60
+            status_is_study = True
+            mode_label.config(text="Study 🎓")
+            timer_running = True
             update_timer()
 
         pause_button = tk.Button(root, text="Pause ⏸️", command=pause_timer, **button_style)
@@ -190,12 +207,86 @@ def show_main_menu():
 
         update_timer()
 
+    def to_do_list():
+        for widget in root.winfo_children():
+            widget.destroy()
+
+        to_do_label = tk.Label(root, text="Enter a New Task:", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        to_do_label.pack(pady=(20, 10))
+
+        to_do_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg="gray25", bg="aliceblue")
+        to_do_entry.pack(pady=(0, 20))
+
+
+        listbox_frame = tk.Frame(root, bg="aliceblue")
+        listbox_frame.pack(pady=10, fill="both", expand=True)
+
+
+        pending_frame = tk.Frame(listbox_frame, bg="aliceblue")
+        pending_frame.pack(side=tk.LEFT, padx=20, fill="both", expand=True)
+
+        pending_label = tk.Label(pending_frame, text="Pending Tasks", font=("Helvetica", 16), bg="aliceblue", fg="gray25")
+        pending_label.pack()
+
+        pending_listbox = tk.Listbox(pending_frame, font=("Helvetica", 14), fg="gray25", bg="white")
+        pending_listbox.pack(fill="both", expand=True, pady=(5, 0))
+
+
+        completed_frame = tk.Frame(listbox_frame, bg="aliceblue")
+        completed_frame.pack(side=tk.LEFT, padx=20, fill="both", expand=True)
+
+        completed_label = tk.Label(completed_frame, text="Completed Tasks", font=("Helvetica", 16), bg="aliceblue", fg="gray25")
+        completed_label.pack()
+
+        completed_listbox = tk.Listbox(completed_frame, font=("Helvetica", 14), fg="gray25", bg="white")
+        completed_listbox.pack(fill="both", expand=True, pady=(5, 0))
+
+        def load_tasks():
+            pending_listbox.delete(0, tk.END)
+            completed_listbox.delete(0, tk.END)
+
+            to_do_array = []
+            with open("todo.csv", mode="r") as csv_file:
+                reader = csv.reader(csv_file)
+                for task, status in reader:
+                    if status == "True":
+                        completed_listbox.insert(tk.END, task)
+                    else:
+                        pending_listbox.insert(tk.END, task)
+                print(to_do_array)
+
+        def add_task(event = None):
+            task_text = to_do_entry.get()
+            if task_text.strip() == "":
+                return
+
+            with open("todo.csv", mode="a", newline="") as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerow([task_text, False])
+
+            to_do_entry.delete(0, tk.END)
+            load_tasks()
+
+        to_do_entry.bind("<Return>", add_task)
+
+        add_task_button = tk.Button(root, text="Add Task", command=add_task, **button_style)
+        add_task_button.pack(pady=20)
+
+        back_button = tk.Button(root, text="Back", command=show_main_menu, **button_style)
+        back_button.pack(pady=0)
+
+        load_tasks()
+
+
+
+
+
     buttons = [
         ("⛰️ Motivation", show_quote),
         ("🕒 Pomodoro Timer", pomodoro),
         ("⚙️ Set Times", set_times),
         ("☮️ Focus Mode", lambda: placeholder("Focus Mode")),
-        ("✅ To-Do List", lambda: placeholder("To-Do List")),
+        ("✅ To-Do List", to_do_list),
         ("📚 Exams", lambda: placeholder("Exams"))
     ]
 
