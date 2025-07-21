@@ -1,9 +1,6 @@
-import tkinter as tk
 import csv
 import random
-
-from fontTools.merge import timer
-from nltk.downloader import update
+import tkinter as tk
 
 study_time = 25
 break_time = 5
@@ -228,7 +225,7 @@ def show_main_menu():
         pending_label = tk.Label(pending_frame, text="Pending Tasks", font=("Helvetica", 16), bg="aliceblue", fg="gray25")
         pending_label.pack()
 
-        pending_listbox = tk.Listbox(pending_frame, font=("Helvetica", 14), fg="gray25", bg="white")
+        pending_listbox = tk.Listbox(pending_frame, font=("Helvetica", 14), fg="gray25", bg="white", selectmode=tk.MULTIPLE)
         pending_listbox.pack(fill="both", expand=True, pady=(5, 0))
 
 
@@ -238,7 +235,7 @@ def show_main_menu():
         completed_label = tk.Label(completed_frame, text="Completed Tasks", font=("Helvetica", 16), bg="aliceblue", fg="gray25")
         completed_label.pack()
 
-        completed_listbox = tk.Listbox(completed_frame, font=("Helvetica", 14), fg="gray25", bg="white")
+        completed_listbox = tk.Listbox(completed_frame, font=("Helvetica", 14), fg="gray25", bg="white", selectmode=tk.MULTIPLE)
         completed_listbox.pack(fill="both", expand=True, pady=(5, 0))
 
         def load_tasks():
@@ -262,20 +259,83 @@ def show_main_menu():
 
             with open("todo.csv", mode="a", newline="") as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow([task_text, False])
+                writer.writerow([task_text, "False"])
 
             to_do_entry.delete(0, tk.END)
             load_tasks()
 
+        def complete_task():
+
+            selected_indices = pending_listbox.curselection() # array of indices (position of tasks in list that have been selected)
+            if not selected_indices: # if no tasks selected, return
+                return
+
+            selected_tasks = [pending_listbox.get(i) for i in selected_indices] # makes array with each task that has been selected using the indices of curselection
+
+            updated_tasks = []
+
+            with open("todo.csv", mode="r") as csv_file:
+                reader = csv.reader(csv_file)
+                for task, status in reader:
+                    if task in selected_tasks and status == "False":
+                        updated_tasks.append([task, "True"])
+                    else:
+                        updated_tasks.append([task, status])
+
+            with open("todo.csv", mode="w", newline="") as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerows(updated_tasks)
+
+            load_tasks()
+
+        def delete_task(event=None):
+
+            selected_tasks = [] # tasks to delete
+
+            for i in pending_listbox.curselection():
+                task = pending_listbox.get(i)
+                selected_tasks.append((task, "False"))
+
+            for i in completed_listbox.curselection():
+                task = completed_listbox.get(i)
+                selected_tasks.append((task, "True"))
+
+            updated_tasks = [] # tasks to keep
+
+            with open("todo.csv", mode="r") as csv_file:
+                reader = csv.reader(csv_file)
+                for task, status in reader:
+                    if (task, status) not in selected_tasks:
+                        updated_tasks.append([task, status]) # updated_tasks only contains the tasks that were unselected to be deleted
+
+            with open("todo.csv", mode="w", newline="") as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerows(updated_tasks) # rewrites the file, only including tasks that were NOT selected to be deleted
+
+            load_tasks()
+
+
+
+
         to_do_entry.bind("<Return>", add_task)
+
+        pending_listbox.bind("<Delete>", delete_task)
+        pending_listbox.bind("<BackSpace>", delete_task)
+        completed_listbox.bind("<Delete>", delete_task)
+        completed_listbox.bind("<BackSpace>", delete_task)
 
         add_task_button = tk.Button(root, text="Add Task", command=add_task, **button_style)
         add_task_button.pack(pady=20)
+
+        complete_button = tk.Button(root, text="Complete Task", command=complete_task, **button_style)
+        complete_button.pack(pady=0)
 
         back_button = tk.Button(root, text="Back", command=show_main_menu, **button_style)
         back_button.pack(pady=0)
 
         load_tasks()
+
+
 
 
 
