@@ -30,6 +30,8 @@ root = tk.Tk()
 root.title("StudyPy")
 root.geometry("800x600")
 root.configure(bg='aliceblue')
+img = tk.PhotoImage(file='icon.png')
+root.iconphoto(False, img)
 
 title_label = tk.Label(
     root,
