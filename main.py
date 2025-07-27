@@ -4,6 +4,26 @@ import tkinter as tk
 import ctypes
 import os
 import platform
+import sys
+
+
+def is_admin():
+    try:
+        if platform.system().lower() == "windows":
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        else:
+            return os.getuid() == 0
+    except:
+        return False
+
+def run_as_admin():
+    if platform.system().lower() == "windows":
+        if not is_admin():
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+            sys.exit()
+
+
+run_as_admin()
 
 
 study_time = 25
@@ -32,6 +52,52 @@ def quotes2array(filepath):
     return quotes
 
 quotes = quotes2array("quotes.csv")
+
+
+
+
+
+def get_hosts_path():
+    system = platform.system().lower()
+    if system == "windows":
+        return r'C:\Windows\System32\drivers\etc\hosts'
+    else:
+        return '/etc/hosts'
+
+def unblock_sites():
+    if not is_admin():
+        return False
+
+    hosts_path = get_hosts_path()
+
+    try:
+        with open(hosts_path, 'r') as file:
+            lines = file.readlines()
+
+        with open(hosts_path, 'w') as file:
+            inside_block = False
+            for line in lines:
+                if line.strip() == '# StudyPy Block START':
+                    inside_block = True
+                    continue
+                elif line.strip() == '# StudyPy Block END':
+                    inside_block = False
+                    continue
+                if not inside_block:  # removes only those inside block (doesn't write those lines back)
+                    file.write(line)
+
+            if os.path.exists("focus_lock.tmp"):
+                os.remove("focus_lock.tmp")
+
+        return True
+    except:
+        return False
+
+
+
+
+
+unblock_sites()
 
 root = tk.Tk()
 root.title("StudyPy")
@@ -156,8 +222,10 @@ def show_main_menu():
                     if pomodoro_time_label.winfo_exists():
                         pomodoro_time_label.config(text = f"{minutes:02d}:{seconds:02d}")
                     remaining_study_time -= 1
+                    block_sites()
                     timer_id = root.after(1000, update_timer)
                 else:
+                    unblock_sites()
                     status_is_study = False
                     pomodoro()
             else:
@@ -176,6 +244,7 @@ def show_main_menu():
         def pause_timer():
             global timer_running, timer_id
             timer_running = False
+            unblock_sites()
             if timer_id is not None:
                 root.after_cancel(timer_id)
                 timer_id = None
@@ -189,6 +258,7 @@ def show_main_menu():
 
         def restart_timer():
             global timer_running, timer_id, remaining_break_time, remaining_study_time, status_is_study
+            unblock_sites()
             if timer_id != None:
                 root.after_cancel(timer_id)
                 timer_id = None
@@ -348,26 +418,69 @@ def show_main_menu():
         for widget in root.winfo_children():
             widget.destroy()
 
-        focus_mode_label = tk.Label(root, text="Focus Mode", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        focus_mode_label = tk.Label(root, text="Focus Settings", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
         focus_mode_label.pack(pady=20)
 
+        website_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg="gray25", bg="aliceblue")
+        website_entry.pack(pady=0)
+
+        website_listbox = tk.Listbox(root, font=("Helvetica", 14), fg="gray25", bg="white", width = 40)
+        website_listbox.pack(pady=10)
+
+        def load_blocked_sites():
+            website_listbox.delete(0, tk.END)
+            try:
+                with open('blocked_sites.csv', 'r') as file:
+                    for row in csv.reader(file):
+                        website_listbox.insert(tk.END, row[0])
+            except FileNotFoundError:
+                pass
 
 
-    def get_hosts_path():
-        system = platform.system().lower()
-        if system == "windows":
-            return r'C:\Windows\System32\drivers\etc\hosts'
-        else:
-            return '/etc/hosts'
+        def add_website():
+            website = website_entry.get().strip()
+            if website:
+                # Check if website already exists
+                with open('blocked_sites.csv', 'r') as file:
+                    if any(website == row[0].strip() for row in csv.reader(file)):
+                        website_entry.delete(0, tk.END)
+                        return
+                
+                with open('blocked_sites.csv', 'a', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow([website])
+                website_entry.delete(0, tk.END)
+                load_blocked_sites()
 
-    def is_admin():
-        try:
-            if platform.system().lower() == "windows":
-                return ctypes.windll.shell32.IsUserAnAdmin()
-            else:
-                return os.getuid() == 0
-        except:
-            return False
+        def remove_website():
+            selected = website_listbox.curselection()
+            if not selected:
+                return
+            websites = website_listbox.get(0, tk.END)
+            updated = []
+            for i in range(len(websites)): # only writes back those that are NOT selected
+                if i not in selected:
+                    updated.append(websites[i])
+            with open('blocked_sites.csv', 'w', newline='') as file:
+                writer = csv.writer(file)
+                for site in updated:
+                    writer.writerow([site])
+            load_blocked_sites()
+
+
+        #buttons
+        add_button = tk.Button(root, text="Add Website", command=add_website, **button_style)
+        add_button.pack(pady=5)
+
+        remove_button = tk.Button(root, text="Remove Selected", command=remove_website, **button_style)
+        remove_button.pack(pady=5)
+
+        back_button = tk.Button(root, text="Back", command=show_main_menu, **button_style)
+        back_button.pack(pady=20)
+
+        load_blocked_sites()
+
+
 
     def block_sites():
         if not is_admin():
@@ -377,48 +490,29 @@ def show_main_menu():
         redirect = "127.0.0.1"
 
         try:
+            with open("focus_lock.tmp", "w") as tmp:
+                tmp.write("locked")
+
             with open('blocked_sites.csv', 'r') as file:
                 websites = [row[0] for row in csv.reader(file)]
                 
             with open(hosts_path, 'a') as hosts_file:
-                hosts_path.write('\n#StudyPy Blocked Sites')
+                hosts_file.write('\n# StudyPy Block START')
                 for site in websites:
                     hosts_file.write(f'{redirect} {site}\n')
                     hosts_file.write(f'{redirect} www.{site}\n')
+                hosts_file.write('# StudyPy Block END')
             return True
         except:
             return False
     
-    def unblock_sites():
-        if not is_admin():
-            return False
-
-        hosts_path = get_hosts_path()
-    
-        try:
-            with open(hosts_path, 'r') as file:
-                lines = file.readLines()
-            
-            with open(hosts_path, 'w') as file:
-                for line in lines:
-                    if "StudyPy Blocked Sites" not in line:
-                        file.write(line)
-            return True
-        except:
-            return False
-        
-
-
-
-
 
     buttons = [
         ("⛰️ Motivation", show_quote),
         ("🕒 Pomodoro Timer", pomodoro),
         ("⚙️ Set Times", set_times),
-        ("☮️ Focus Mode", focus_mode),
+        ("☮️ Focus Settings", focus_mode),
         ("✅ To-Do List", to_do_list),
-        ("📚 Exams", lambda: placeholder("Exams"))
     ]
 
     for text, command in buttons:
