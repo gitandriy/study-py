@@ -1,18 +1,12 @@
 # StudyPy
 
 A simple Python app to help you study better.  
-Features a Pomodoro timer, motivational quotes, and customizable study/break times.
+Features a Pomodoro timer, motivational quotes, website blocking and customizable study/break times.
 
 ## How to use
 
 - Open main.py 
-- Click buttons to start the timer or see quotes  
-- Set your own study and break times  
+- Click buttons to access the Pomodoro Timer, Focus Settings, Quotes, and more!
+- To enable focus mode, set your blocked websites in "Focus Settings" and start a pomodoro timer. During your study time, your websites will be blocked so you can focus on your studies.
 
-## Planned features
-
-- Focus mode (e.g. blocking distracting websites)
-- To-Do list  
-- Exam tracker  
-
-Still building it, so more cool features coming soon!  
+Quite sloppy as it's my first public project, feel free to leave advice and let me know of any issues!
