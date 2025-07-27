@@ -1,6 +1,10 @@
 import csv
 import random
 import tkinter as tk
+import ctypes
+import os
+import platform
+
 
 study_time = 25
 break_time = 5
@@ -9,6 +13,9 @@ remaining_study_time = 0
 remaining_break_time = 0
 timer_running = True
 timer_id = None
+
+
+
 
 
 def placeholder(name):
@@ -337,7 +344,69 @@ def show_main_menu():
 
         load_tasks()
 
+    def focus_mode():
+        for widget in root.winfo_children():
+            widget.destroy()
 
+        focus_mode_label = tk.Label(root, text="Focus Mode", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        focus_mode_label.pack(pady=20)
+
+
+
+    def get_hosts_path():
+        system = platform.system().lower()
+        if system == "windows":
+            return r'C:\Windows\System32\drivers\etc\hosts'
+        else:
+            return '/etc/hosts'
+
+    def is_admin():
+        try:
+            if platform.system().lower() == "windows":
+                return ctypes.windll.shell32.IsUserAnAdmin()
+            else:
+                return os.getuid() == 0
+        except:
+            return False
+
+    def block_sites():
+        if not is_admin():
+            return False
+
+        hosts_path = get_hosts_path()
+        redirect = "127.0.0.1"
+
+        try:
+            with open('blocked_sites.csv', 'r') as file:
+                websites = [row[0] for row in csv.reader(file)]
+                
+            with open(hosts_path, 'a') as hosts_file:
+                hosts_path.write('\n#StudyPy Blocked Sites')
+                for site in websites:
+                    hosts_file.write(f'{redirect} {site}\n')
+                    hosts_file.write(f'{redirect} www.{site}\n')
+            return True
+        except:
+            return False
+    
+    def unblock_sites():
+        if not is_admin():
+            return False
+
+        hosts_path = get_hosts_path()
+    
+        try:
+            with open(hosts_path, 'r') as file:
+                lines = file.readLines()
+            
+            with open(hosts_path, 'w') as file:
+                for line in lines:
+                    if "StudyPy Blocked Sites" not in line:
+                        file.write(line)
+            return True
+        except:
+            return False
+        
 
 
 
@@ -347,7 +416,7 @@ def show_main_menu():
         ("⛰️ Motivation", show_quote),
         ("🕒 Pomodoro Timer", pomodoro),
         ("⚙️ Set Times", set_times),
-        ("☮️ Focus Mode", lambda: placeholder("Focus Mode")),
+        ("☮️ Focus Mode", focus_mode),
         ("✅ To-Do List", to_do_list),
         ("📚 Exams", lambda: placeholder("Exams"))
     ]
