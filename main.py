@@ -5,7 +5,7 @@ import ctypes
 import os
 import platform
 import sys
-
+import time
 import subprocess
 
 def flush_dns(): # fixing host file not synced with browser results
@@ -122,6 +122,7 @@ def unblock_sites():
         flush_dns()
         return True
     except:
+        print(f"unblock_sites error: {e}")
         return False
 
 
@@ -244,7 +245,7 @@ def show_main_menu():
 
             if status_is_study:
 
-                if remaining_study_time == study_time * 60: # start call
+                if remaining_study_time >= study_time * 60: # start call
                     block_sites()
 
                 if remaining_study_time > 0:
@@ -269,9 +270,10 @@ def show_main_menu():
                     timer_id = root.after(1000, update_timer)
                 else:
                     status_is_study = True
+                    mode_label.config(text="Study 🎓")
                     remaining_study_time = study_time * 60
-                    remaining_break_time = break_time * 60
-                    update_timer()
+                    block_sites()
+                    timer_id = root.after(1000, update_timer)
 
         def pause_timer():
             global timer_running, timer_id
@@ -530,7 +532,7 @@ def show_main_menu():
         if not is_admin():
             print("error: requires admin priveleges")
             return False
-        print("✓ Admin Priveleges")
+        print("✓ Admin Privileges")
 
         # Check if CSV exists
         if not os.path.exists('blocked_sites.csv'):
@@ -579,6 +581,7 @@ def show_main_menu():
             print("✓ wrote to host file")
             flush_dns()
             print("✓ DNS flushed")
+            time.sleep(1) # avoids race condition with multiple domains
             return True
 
         except Exception as e:
