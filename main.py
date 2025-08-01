@@ -6,6 +6,26 @@ import os
 import platform
 import sys
 
+import subprocess
+
+def flush_dns(): # fixing host file not synced with browser results
+    try:
+        system = platform.system().lower()
+        if system == "windows":
+            subprocess.run(['ipconfig', '/flushdns'], capture_output=True, check=True)
+        elif system == "darwin":
+            subprocess.run(['sudo', 'dscacheutil', '-flushcache'], capture_output=True, check=True)
+        elif system == "linux":
+            try:
+                subprocess.run(['sudo', 'systemctl', 'restart', 'systemd-resolved'], capture_output=True, check=True)
+            except:
+                try:
+                    subprocess.run(['sudo', 'service', 'network-manager', 'restart'], capture_output=True, check=True)
+                except:
+                    pass
+        return True
+    except:
+        return False
 
 def is_admin():
     try:
@@ -21,10 +41,9 @@ def run_as_admin():
         if not is_admin():
             ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
             sys.exit()
-
+            print("Please run as admin for website blocking functionality.")
 
 run_as_admin()
-
 
 study_time = 25
 break_time = 5
@@ -33,15 +52,27 @@ remaining_study_time = 0
 remaining_break_time = 0
 timer_running = True
 timer_id = None
-
-
-
+isDarkMode = False
+themecolour = "aliceblue"
+text_colour = "gray25"
 
 
 def placeholder(name):
     print(f"{name} clicked!")
 
+def toggle_theme():
+    global isDarkMode, themecolour, StudyPyColour, text_colour
+    if isDarkMode:
+        isDarkMode = False
+        themecolour = "aliceblue"
+        text_colour = "gray25"
+    else:
+        isDarkMode = True
+        themecolour = "LightSteelBlue4"
+        text_colour = "white"
 
+    root.configure(bg = themecolour)
+    show_main_menu()
 
 def quotes2array(filepath):
     quotes = []
@@ -52,10 +83,6 @@ def quotes2array(filepath):
     return quotes
 
 quotes = quotes2array("quotes.csv")
-
-
-
-
 
 def get_hosts_path():
     system = platform.system().lower()
@@ -77,18 +104,22 @@ def unblock_sites():
         with open(hosts_path, 'w') as file:
             inside_block = False
             for line in lines:
-                if line.strip() == '# StudyPy Block START':
+                if '# StudyPy Block START' in line.strip():
                     inside_block = True
                     continue
-                elif line.strip() == '# StudyPy Block END':
+                elif '# StudyPy Block END' in line.strip():
                     inside_block = False
                     continue
-                if not inside_block:  # removes only those inside block (doesn't write those lines back)
-                    file.write(line)
+
+                if inside_block:
+                    continue
+
+                file.write(line)
 
             if os.path.exists("focus_lock.tmp"):
                 os.remove("focus_lock.tmp")
 
+        flush_dns()
         return True
     except:
         return False
@@ -102,38 +133,34 @@ unblock_sites()
 root = tk.Tk()
 root.title("StudyPy")
 root.geometry("800x600")
-root.configure(bg='aliceblue')
+root.configure(bg=themecolour)
 img = tk.PhotoImage(file='icon.png')
 root.iconphoto(False, img)
-
-title_label = tk.Label(
-    root,
-    text = "StudyPy",
-    font = ("Helvetica", 32),
-    fg = "gray25",
-    bg = "aliceblue"
-)
-
-
 
 def show_main_menu():
     for widget in root.winfo_children():
         widget.destroy()
 
-    title_label = tk.Label(root, text = "StudyPy", font = ("Helvetica", 32), fg = "gray25", bg = "aliceblue")
+    title_label = tk.Label(
+        root,
+        text="StudyPy",
+        font=("Helvetica", 32),
+        fg="gray25" if not isDarkMode else "white",
+        bg=themecolour
+    )
     title_label.pack(pady=20)
 
-    button_frame = tk.Frame(root, bg = 'aliceblue')
+    button_frame = tk.Frame(root, bg = themecolour)
     button_frame.pack(pady=20)
 
     button_style = {
         "width": 20,
         "height": 2,
         "font": ("Helvetica", 14),
-        "bg": "white",
-        "fg": "gray25",
-        "activebackground": "gray25",
-        "activeforeground": "white",
+        "bg": "white" if not isDarkMode else "gray35",
+        "fg": "gray25" if not isDarkMode else "white",
+        "activebackground": "gray35" if not isDarkMode else "white",
+        "activeforeground": "white" if not isDarkMode else "gray25",
         "bd": 2
     }
 
@@ -143,7 +170,7 @@ def show_main_menu():
 
         quote = random.choice(quotes)
 
-        quote_label = tk.Label(root, text=quote, font=("Helvetica", 18), wraplength=700, justify="center", bg="aliceblue", fg="gray25")
+        quote_label = tk.Label(root, text=quote, font=("Helvetica", 18), wraplength=700, justify="center", bg=themecolour, fg=text_colour)
         quote_label.pack(pady=100)
 
         back_button = tk.Button(root, text="Back", command=show_main_menu, **button_style)
@@ -155,16 +182,16 @@ def show_main_menu():
         for widget in root.winfo_children():
             widget.destroy()
 
-        study_time_label = tk.Label(root, text="Study Time:", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        study_time_label = tk.Label(root, text="Study Time:", font=("Helvetica", 18), justify="center", bg=themecolour, fg=text_colour)
         study_time_label.pack(pady=(60,10))
 
-        study_time_entry = tk.Entry(root, font = ("Helvetica", 18), justify="center", fg = "gray25", bg = "aliceblue")
+        study_time_entry = tk.Entry(root, font = ("Helvetica", 18), justify="center", fg = text_colour, bg = themecolour)
         study_time_entry.pack(pady=0)
 
-        break_time_label = tk.Label(root, text="Break Time:", font=("Helvetica", 18), justify="center", bg="aliceblue",fg="gray25")
+        break_time_label = tk.Label(root, text="Break Time:", font=("Helvetica", 18), justify="center", bg=themecolour,fg=text_colour)
         break_time_label.pack(pady=(60, 10))
 
-        break_time_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg="gray25", bg="aliceblue")
+        break_time_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg=text_colour, bg=themecolour)
         break_time_entry.pack(pady=0)
 
         def save_times():
@@ -202,11 +229,11 @@ def show_main_menu():
         status_is_study = True
         timer_id = None
 
-        mode_label = tk.Label(root, text="Study 🎓" if status_is_study else "Break 😌", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        mode_label = tk.Label(root, text="Study 🎓" if status_is_study else "Break 😌", font=("Helvetica", 18), justify="center", bg=themecolour, fg=text_colour)
         mode_label.pack(pady=(60, 10))
 
 
-        pomodoro_time_label = tk.Label(root, text="", font=("Helvetica", 30), justify="center", bg="aliceblue", fg="gray25")
+        pomodoro_time_label = tk.Label(root, text="", font=("Helvetica", 30), justify="center", bg=themecolour, fg=text_colour)
         pomodoro_time_label.pack(pady=(20, 10))
 
         def update_timer():
@@ -216,18 +243,23 @@ def show_main_menu():
                 return
 
             if status_is_study:
+
+                if remaining_study_time == study_time * 60: # start call
+                    block_sites()
+
                 if remaining_study_time > 0:
                     minutes = remaining_study_time // 60
                     seconds = remaining_study_time % 60
                     if pomodoro_time_label.winfo_exists():
                         pomodoro_time_label.config(text = f"{minutes:02d}:{seconds:02d}")
                     remaining_study_time -= 1
-                    block_sites()
                     timer_id = root.after(1000, update_timer)
                 else:
                     unblock_sites()
                     status_is_study = False
-                    pomodoro()
+                    mode_label.config(text="Break 😌")
+                    remaining_break_time = break_time * 60
+                    timer_id = root.after(1000, update_timer)
             else:
                 if remaining_break_time > 0:
                     minutes = remaining_break_time // 60
@@ -253,6 +285,8 @@ def show_main_menu():
             global timer_running, timer_id
             if not timer_running:
                 timer_running = True
+                if status_is_study:
+                    block_sites()
                 if timer_id is None:
                     update_timer()
 
@@ -278,7 +312,7 @@ def show_main_menu():
         restart_button = tk.Button(root, text="Restart 🔄", command=restart_timer, **button_style)
         restart_button.pack(pady=20)
 
-        back_button = tk.Button(root, text="Back", command=show_main_menu, **button_style)
+        back_button = tk.Button(root, text="Back", command=lambda: [show_main_menu(), unblock_sites()], **button_style)
         back_button.pack(pady=40)
 
         update_timer()
@@ -287,31 +321,31 @@ def show_main_menu():
         for widget in root.winfo_children():
             widget.destroy()
 
-        to_do_label = tk.Label(root, text="Enter a New Task:", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        to_do_label = tk.Label(root, text="Enter a New Task:", font=("Helvetica", 18), justify="center", bg=themecolour, fg=text_colour)
         to_do_label.pack(pady=(20, 10))
 
-        to_do_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg="gray25", bg="aliceblue")
+        to_do_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg=text_colour, bg=themecolour)
         to_do_entry.pack(pady=(0, 20))
 
 
-        listbox_frame = tk.Frame(root, bg="aliceblue")
+        listbox_frame = tk.Frame(root, bg=themecolour)
         listbox_frame.pack(pady=10, fill="both", expand=True)
 
 
-        pending_frame = tk.Frame(listbox_frame, bg="aliceblue")
+        pending_frame = tk.Frame(listbox_frame, bg=themecolour)
         pending_frame.pack(side=tk.LEFT, padx=20, fill="both", expand=True)
 
-        pending_label = tk.Label(pending_frame, text="Pending Tasks", font=("Helvetica", 16), bg="aliceblue", fg="gray25")
+        pending_label = tk.Label(pending_frame, text="Pending Tasks", font=("Helvetica", 16), bg=themecolour, fg=text_colour)
         pending_label.pack()
 
         pending_listbox = tk.Listbox(pending_frame, font=("Helvetica", 14), fg="gray25", bg="white", selectmode=tk.MULTIPLE)
         pending_listbox.pack(fill="both", expand=True, pady=(5, 0))
 
 
-        completed_frame = tk.Frame(listbox_frame, bg="aliceblue")
+        completed_frame = tk.Frame(listbox_frame, bg=themecolour)
         completed_frame.pack(side=tk.LEFT, padx=20, fill="both", expand=True)
 
-        completed_label = tk.Label(completed_frame, text="Completed Tasks", font=("Helvetica", 16), bg="aliceblue", fg="gray25")
+        completed_label = tk.Label(completed_frame, text="Completed Tasks", font=("Helvetica", 16), bg=themecolour, fg=text_colour)
         completed_label.pack()
 
         completed_listbox = tk.Listbox(completed_frame, font=("Helvetica", 14), fg="gray25", bg="white", selectmode=tk.MULTIPLE)
@@ -418,10 +452,10 @@ def show_main_menu():
         for widget in root.winfo_children():
             widget.destroy()
 
-        focus_mode_label = tk.Label(root, text="Focus Settings", font=("Helvetica", 18), justify="center", bg="aliceblue", fg="gray25")
+        focus_mode_label = tk.Label(root, text="Focus Settings", font=("Helvetica", 18), justify="center", bg=themecolour, fg=text_colour)
         focus_mode_label.pack(pady=20)
 
-        website_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg="gray25", bg="aliceblue")
+        website_entry = tk.Entry(root, font=("Helvetica", 18), justify="center", fg=text_colour, bg=themecolour)
         website_entry.pack(pady=0)
 
         website_listbox = tk.Listbox(root, font=("Helvetica", 14), fg="gray25", bg="white", width = 40)
@@ -450,6 +484,11 @@ def show_main_menu():
                     writer = csv.writer(file)
                     writer.writerow([website])
                 website_entry.delete(0, tk.END)
+
+                if os.path.exists("focus_lock.tmp"):
+                    unblock_sites()
+                    block_sites()
+
                 load_blocked_sites()
 
         def remove_website():
@@ -463,6 +502,11 @@ def show_main_menu():
                     updated.append(websites[i])
             with open('blocked_sites.csv', 'w', newline='') as file:
                 writer = csv.writer(file)
+
+                if os.path.exists("focus_lock.tmp"):
+                    unblock_sites()
+                    block_sites()
+
                 for site in updated:
                     writer.writerow([site])
             load_blocked_sites()
@@ -480,32 +524,70 @@ def show_main_menu():
 
         load_blocked_sites()
 
-
-
     def block_sites():
+        print("--- debugging block_sites ---")
+
         if not is_admin():
+            print("error: requires admin priveleges")
+            return False
+        print("✓ Admin Priveleges")
+
+        # Check if CSV exists
+        if not os.path.exists('blocked_sites.csv'):
+            print("blocked_sites.csv NOT FOUND")
+            return False
+        print("✓ blocked_sites.csv exists")
+
+        try:
+            with open('blocked_sites.csv', 'r') as file:
+                content = file.read()
+                print(f"CSV content: '{content}'")
+
+            with open('blocked_sites.csv', 'r') as file:
+                websites = [row[0].strip() for row in csv.reader(file) if row and row[0].strip()]
+                print(f"parsed websites: {websites}")
+
+            if not websites:
+                print("error: no websites to block in csv ")
+                return False
+
+        except Exception as e:
+            print(f"ERROR reading CSV: {e}")
             return False
 
         hosts_path = get_hosts_path()
-        redirect = "127.0.0.1"
+        print(f"hosts path: {hosts_path}")
 
+        with open(hosts_path, 'r') as file:
+            content = file.read()
+            if "# StudyPy Block START" in content:
+                print("sites already blocked - removing first")
+                unblock_sites()
+
+        # Try to write to hosts
         try:
-            with open("focus_lock.tmp", "w") as tmp:
-                tmp.write("locked")
-
-            with open('blocked_sites.csv', 'r') as file:
-                websites = [row[0] for row in csv.reader(file)]
-                
             with open(hosts_path, 'a') as hosts_file:
-                hosts_file.write('\n# StudyPy Block START')
+                hosts_file.write('\n# StudyPy Block START\n')
                 for site in websites:
-                    hosts_file.write(f'{redirect} {site}\n')
-                    hosts_file.write(f'{redirect} www.{site}\n')
-                hosts_file.write('# StudyPy Block END')
+                    line1 = f'127.0.0.1 {site}\n'
+                    line2 = f'127.0.0.1 www.{site}\n'
+                    hosts_file.write(line1)
+                    hosts_file.write(line2)
+                    print(f"added: {line1.strip()} and {line2.strip()}")
+                hosts_file.write('# StudyPy Block END\n')
+
+            print("✓ wrote to host file")
+            flush_dns()
+            print("✓ DNS flushed")
             return True
-        except:
+
+        except Exception as e:
+            print(f"error: couldn't write to hosts: {e}")
             return False
-    
+
+
+
+
 
     buttons = [
         ("⛰️ Motivation", show_quote),
@@ -515,9 +597,31 @@ def show_main_menu():
         ("✅ To-Do List", to_do_list),
     ]
 
+    if isDarkMode:
+        buttons.append(("Light ☀️", toggle_theme))
+    else:
+        buttons.append(("Dark 🌙", toggle_theme))
+
     for text, command in buttons:
         b = tk.Button(button_frame, text=text, command=command, **button_style)
         b.pack(pady=5)
+
+
+def closing():
+    global timer_id
+
+    #cancel timer
+    try:
+        if timer_id is not None:
+            root.after_cancel(timer_id)
+    except:
+        pass
+
+    unblock_sites()
+
+    root.destroy()
+
+root.protocol("WM_DELETE_WINDOW", closing)
 
 show_main_menu()
 root.mainloop()
