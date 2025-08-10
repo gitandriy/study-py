@@ -661,6 +661,8 @@ def show_main_menu():
         stats_text_label = tk.Label(root, text=f"Total Time Studied ⌛: {total_time_studied}\nTotal Days 📊: {total_days}\nCurrent Day Streak 🔥: {current_day_streak}\nLongest Streak 🏆: {longest_streak}\nLast Study Date 📅: {last_study_date}", font=("Helvetica", 18), justify="center", bg=themecolour, fg=text_colour)
         stats_text_label.pack(pady=30)
 
+        back_button = tk.Button(root, text="Back", command=show_main_menu, **button_style)
+        back_button.pack(pady=20)
 
 
 
