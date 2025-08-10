@@ -5,6 +5,8 @@ import ctypes
 import os
 import platform
 import sys
+from datetime import datetime, timedelta
+
 
 import subprocess
 
@@ -45,6 +47,15 @@ def run_as_admin():
 
 run_as_admin()
 
+# stats variables
+global total_time_studied, total_days, current_day_streak, longest_streak
+
+total_time_studied = 0
+total_days = 0
+current_day_streak = 0
+longest_streak = 0
+
+
 study_time = 25
 break_time = 5
 status_is_study = True
@@ -56,6 +67,17 @@ isDarkMode = False
 themecolour = "aliceblue"
 text_colour = "gray25"
 
+with open("stats.csv", mode='r', newline='') as file: # write updated variables back to csv once program closed
+
+    csv_reader = list(csv.reader(file)) # gets stats values as array
+    total_time_studied = int(csv_reader[1][0])
+    total_days = int(csv_reader[1][1])
+    current_day_streak = int(csv_reader[1][2])
+    longest_streak = int(csv_reader[1][3])
+    last_study_date = csv_reader[1][4]
+
+
+print(f"Total Time Studied: {total_time_studied}\nTotal Days: {total_days}\nCurrent Day Streak: {current_day_streak}\nLongest Streak: {longest_streak}\nLast Study Date: {last_study_date}")
 
 def placeholder(name):
     print(f"{name} clicked!")
@@ -214,7 +236,7 @@ def show_main_menu():
 
 
     def pomodoro():
-        global status_is_study, remaining_study_time, remaining_break_time, timer_running, timer_id
+        global study_time, status_is_study, remaining_study_time, remaining_break_time, timer_running, timer_id
 
         if timer_id is not None: # if timer id exists (from prev pomodoro) delete it
             root.after_cancel(timer_id)
@@ -237,7 +259,7 @@ def show_main_menu():
         pomodoro_time_label.pack(pady=(20, 10))
 
         def update_timer():
-            global remaining_study_time, remaining_break_time, status_is_study, timer_id
+            global remaining_study_time, remaining_break_time, status_is_study, timer_id, last_study_date, total_time_studied, total_days, current_day_streak, longest_streak
 
             if not timer_running:
                 return
@@ -255,6 +277,23 @@ def show_main_menu():
                     remaining_study_time -= 1
                     timer_id = root.after(1000, update_timer)
                 else:
+
+                    total_time_studied += study_time # add study time to stats
+                    last_study_date_obj = datetime.strptime(last_study_date, "%Y-%m-%d").date() # convert str date from csv to date object for comparison
+                    today = datetime.today().date()
+                    if last_study_date_obj < today:
+                        total_days += 1
+
+                        if today == last_study_date_obj + timedelta(days = 1):
+                            current_day_streak += 1
+                        else:
+                            current_day_streak = 1 # resets to 1 as they studied today if they reach here
+
+                        if current_day_streak > longest_streak:
+                            longest_streak = current_day_streak
+
+                        last_study_date = today.strftime('%Y-%m-%d')
+
                     unblock_sites()
                     status_is_study = False
                     mode_label.config(text="Break 😌")
@@ -264,14 +303,16 @@ def show_main_menu():
                 if remaining_break_time > 0:
                     minutes = remaining_break_time // 60
                     seconds = remaining_break_time % 60
-                    pomodoro_time_label.config(text = f"{minutes:02d}:{seconds:02d}")
+                    if pomodoro_time_label.winfo_exists():
+                        pomodoro_time_label.config(text=f"{minutes:02d}:{seconds:02d}")
                     remaining_break_time -= 1
                     timer_id = root.after(1000, update_timer)
                 else:
                     status_is_study = True
                     remaining_study_time = study_time * 60
                     remaining_break_time = break_time * 60
-                    update_timer()
+                    mode_label.config(text="Study 🎓")
+                    timer_id = root.after(1000, update_timer)
 
         def pause_timer():
             global timer_running, timer_id
@@ -303,6 +344,30 @@ def show_main_menu():
             timer_running = True
             update_timer()
 
+        def save_partial_study_time(): # saves study time even if the session closes before study time finished
+            global total_time_studied, status_is_study, remaining_study_time, study_time, time_studied_seconds, last_study_date, total_days, current_day_streak, longest_streak
+
+            if status_is_study and remaining_study_time < study_time * 60:
+                time_studied_seconds = study_time * 60 - remaining_study_time
+                total_time_studied += round(time_studied_seconds / 60) # rounds to the closest minute
+
+            last_study_date_obj = datetime.strptime(last_study_date, "%Y-%m-%d").date()
+            today = datetime.today().date()
+
+            if last_study_date_obj < today:
+                total_days += 1
+
+                if today == last_study_date_obj + timedelta(days=1):
+                    current_day_streak += 1
+                else:
+                    current_day_streak = 1  # resets to 1 as they studied today if they reach here
+
+                if current_day_streak > longest_streak:
+                    longest_streak = current_day_streak
+
+                last_study_date = today.strftime('%Y-%m-%d')
+
+
         pause_button = tk.Button(root, text="Pause ⏸️", command=pause_timer, **button_style)
         pause_button.pack(pady=20)
 
@@ -312,7 +377,7 @@ def show_main_menu():
         restart_button = tk.Button(root, text="Restart 🔄", command=restart_timer, **button_style)
         restart_button.pack(pady=20)
 
-        back_button = tk.Button(root, text="Back", command=lambda: [show_main_menu(), unblock_sites()], **button_style)
+        back_button = tk.Button(root, text="Back", command=lambda: [show_main_menu(), unblock_sites(), save_partial_study_time()], **button_style)
         back_button.pack(pady=40)
 
         update_timer()
@@ -474,12 +539,12 @@ def show_main_menu():
         def add_website():
             website = website_entry.get().strip()
             if website:
-                # Check if website already exists
+                # check if website already exists
                 with open('blocked_sites.csv', 'r') as file:
                     if any(website == row[0].strip() for row in csv.reader(file)):
                         website_entry.delete(0, tk.END)
                         return
-                
+
                 with open('blocked_sites.csv', 'a', newline='') as file:
                     writer = csv.writer(file)
                     writer.writerow([website])
@@ -532,7 +597,7 @@ def show_main_menu():
             return False
         print("✓ Admin Priveleges")
 
-        # Check if CSV exists
+        # check if CSV exists
         if not os.path.exists('blocked_sites.csv'):
             print("blocked_sites.csv NOT FOUND")
             return False
@@ -564,7 +629,7 @@ def show_main_menu():
                 print("sites already blocked - removing first")
                 unblock_sites()
 
-        # Try to write to hosts
+        # try to write to hosts
         try:
             with open(hosts_path, 'a') as hosts_file:
                 hosts_file.write('\n# StudyPy Block START\n')
@@ -586,6 +651,16 @@ def show_main_menu():
             return False
 
 
+    def stats():
+        for widget in root.winfo_children():
+            widget.destroy()
+
+        stats_title_label = tk.Label(root, text="Stats:", font=("Helvetica", 26), justify="center", bg=themecolour, fg=text_colour)
+        stats_title_label.pack(pady=(60,10))
+
+        stats_text_label = tk.Label(root, text=f"Total Time Studied ⌛: {total_time_studied}\nTotal Days 📊: {total_days}\nCurrent Day Streak 🔥: {current_day_streak}\nLongest Streak 🏆: {longest_streak}\nLast Study Date 📅: {last_study_date}", font=("Helvetica", 18), justify="center", bg=themecolour, fg=text_colour)
+        stats_text_label.pack(pady=30)
+
 
 
 
@@ -595,7 +670,9 @@ def show_main_menu():
         ("⚙️ Set Times", set_times),
         ("☮️ Focus Settings", focus_mode),
         ("✅ To-Do List", to_do_list),
+        ("📊 Stats", stats)
     ]
+
 
     if isDarkMode:
         buttons.append(("Light ☀️", toggle_theme))
@@ -608,7 +685,13 @@ def show_main_menu():
 
 
 def closing():
-    global timer_id
+    global timer_id, total_time_studied, total_days, current_day_streak, longest_streak
+
+    with open("stats.csv", mode="w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(['total_time_studied', 'total_days', 'current_day_streak', 'longest_streak', 'last_study_date'])
+        writer.writerow([total_time_studied, total_days, current_day_streak, longest_streak, last_study_date])
+
 
     #cancel timer
     try:
